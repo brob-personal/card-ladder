@@ -4,7 +4,15 @@ from engine.cards import Card, create_standard_deck
 from engine.deck import Deck
 from engine.game_state import GameState
 from engine.player import Player
-from games.hearts.logic import find_two_of_clubs_owner, get_turn_legal_plays, play_hearts_hand
+from games.hearts.logic import (
+    advance_ai_players,
+    apply_turn_play,
+    emit_match_start_event,
+    finalize_hearts_scores,
+    find_two_of_clubs_owner,
+    get_turn_legal_plays,
+    play_hearts_hand,
+)
 from games.hearts.rules import (
     determine_trick_winner,
     handle_shooting_the_moon,
@@ -157,6 +165,74 @@ class TestHandleShootingTheMoon(unittest.TestCase):
 
 
 class TestHeartsHandFlow(unittest.TestCase):
+    def test_apply_turn_play_completes_trick_and_advances_round_like_terminal_flow(self):
+        players = [
+            Player(name="You", hand=[Card(suit="clubs", rank="2")], is_human=True),
+            Player(name="Alfred", hand=[Card(suit="clubs", rank="K")]),
+            Player(name="North", hand=[Card(suit="clubs", rank="Q")]),
+            Player(name="East", hand=[Card(suit="clubs", rank="J")]),
+        ]
+        state = GameState(players=players, current_player_index=0, round_number=1)
+
+        trick_complete_payloads: list[dict[str, object]] = []
+
+        def event_callback(event_name: str, payload: dict[str, object]) -> None:
+            if event_name == "trick_complete":
+                trick_complete_payloads.append(payload)
+
+        playable_cards = get_turn_legal_plays(
+            state.players[0].hand,
+            state.current_trick,
+            state.hearts_broken,
+            state.round_number,
+        )
+        apply_turn_play(
+            state,
+            0,
+            playable_cards[0],
+            event_callback=event_callback,
+        )
+        advance_ai_players(state, event_callback=event_callback)
+
+        self.assertEqual(len(trick_complete_payloads), 1)
+        self.assertEqual(trick_complete_payloads[0]["winner"].name, "Alfred")
+        self.assertEqual(trick_complete_payloads[0]["round_number"], 1)
+        self.assertEqual(state.round_number, 2)
+        self.assertEqual(state.current_player_index, 1)
+        self.assertEqual(state.players[1].taken_cards, trick_complete_payloads[0]["played_cards"])
+
+    def test_event_callback_emits_lightweight_hand_flow_events(self):
+        players = [
+            Player(name="You", hand=[Card(suit="clubs", rank="2")], is_human=True),
+            Player(name="Alfred", hand=[Card(suit="hearts", rank="K")]),
+            Player(name="North", hand=[Card(suit="clubs", rank="Q")]),
+            Player(name="East", hand=[Card(suit="clubs", rank="J")]),
+        ]
+        state = GameState(players=players, current_player_index=0, round_number=1)
+
+        seen_events: list[str] = []
+
+        def event_callback(event_name: str, payload: dict[str, object]) -> None:
+            seen_events.append(event_name)
+
+        emit_match_start_event(state, event_callback=event_callback)
+        apply_turn_play(
+            state,
+            0,
+            Card(suit="clubs", rank="2"),
+            event_callback=event_callback,
+        )
+        advance_ai_players(state, event_callback=event_callback)
+        finalize_hearts_scores(state, event_callback=event_callback)
+
+        self.assertEqual(seen_events[0], "match_start")
+        self.assertIn("trick_start", seen_events)
+        self.assertIn("card_played", seen_events)
+        self.assertIn("trick_winner", seen_events)
+        self.assertIn("hearts_broken", seen_events)
+        self.assertIn("hand_complete", seen_events)
+        self.assertIn("trick_complete", seen_events)
+
     def test_complete_hand_plays_all_cards_and_finishes_cleanly(self):
         players = [
             Player(name="South"),

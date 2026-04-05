@@ -40,14 +40,12 @@ def setup_hearts_round(human_name: str = "You", ai_names: list[str] | None = Non
 def play_hearts_hand(state: GameState, event_callback=None) -> dict[str, object]:
     print("Starting a 4-player Hearts hand.")
     print(f"{state.current_player().name} leads first with the 2 of clubs.\n")
+    emit_match_start_event(state, event_callback)
 
     while state.players[0].hand:
         play_trick(state, event_callback=event_callback)
-        state.round_number += 1
 
-    scores = score_completed_hand(state.players)
-    for player, score in zip(state.players, scores):
-        player.score = score
+    finalize_hearts_scores(state, event_callback=event_callback)
 
     print("Hand complete.\n")
     for player in state.players:
@@ -73,14 +71,11 @@ def create_players(human_name: str, ai_names: list[str] | None = None) -> list[P
 
 
 def play_trick(state: GameState, event_callback=None) -> None:
-    lead_player_index = state.current_player_index
-    played_cards: list[Card] = []
-
     print(f"Trick {state.round_number}")
-    for offset in range(4):
-        player_index = (lead_player_index + offset) % 4
+    for _ in range(4):
+        player_index = state.current_player_index
         player = state.players[player_index]
-        current_trick = list(played_cards)
+        current_trick = list(state.current_trick)
         playable_cards = get_turn_legal_plays(player.hand, current_trick, state.hearts_broken, state.round_number)
 
         if player.is_human:
@@ -89,34 +84,102 @@ def play_trick(state: GameState, event_callback=None) -> None:
             card = choose_card_to_play(playable_cards, current_trick, state.hearts_broken)
             print(f"{player.name} plays {card}")
 
-        player.hand.remove(card)
-        played_cards.append(card)
-        state.current_trick = list(played_cards)
-        state.hearts_broken = update_hearts_broken(state.hearts_broken, [card])
+        completed_trick = apply_turn_play(
+            state,
+            player_index,
+            card,
+            event_callback=event_callback,
+        )
+        if completed_trick is not None:
+            print(f"{completed_trick['winner'].name} takes the trick.\n")
 
-    winner_index = determine_trick_winner(played_cards, lead_player_index)
-    winner = state.players[winner_index]
-    winner.taken_cards.extend(played_cards)
-    state.current_trick = []
-    state.current_player_index = winner_index
 
-    if event_callback is not None:
-        event_callback(
-            "trick_complete",
+def apply_turn_play(
+    state: GameState,
+    player_index: int,
+    card: Card,
+    event_callback=None,
+) -> dict[str, object] | None:
+    is_trick_start = len(state.current_trick) == 0
+    lead_player_index = (state.current_player_index - len(state.current_trick)) % len(state.players)
+    player = state.players[player_index]
+    if is_trick_start:
+        emit_hearts_event(
+            event_callback,
+            "trick_start",
             {
                 "round_number": state.round_number,
-                "winner": winner,
-                "winner_index": winner_index,
-                "played_cards": list(played_cards),
+                "lead_player": player,
+                "lead_player_index": player_index,
                 "players": state.players,
                 "hearts_broken": state.hearts_broken,
             },
         )
 
-    print(f"{winner.name} takes the trick.\n")
+    player.hand.remove(card)
+    state.current_trick.append(card)
+    emit_hearts_event(
+        event_callback,
+        "card_played",
+        {
+            "round_number": state.round_number,
+            "player": player,
+            "player_index": player_index,
+            "card": card,
+            "current_trick": list(state.current_trick),
+            "players": state.players,
+            "hearts_broken": state.hearts_broken,
+        },
+    )
+
+    hearts_was_broken = state.hearts_broken
+    state.hearts_broken = update_hearts_broken(state.hearts_broken, [card])
+    if not hearts_was_broken and state.hearts_broken:
+        emit_hearts_event(
+            event_callback,
+            "hearts_broken",
+            {
+                "round_number": state.round_number,
+                "player": player,
+                "player_index": player_index,
+                "card": card,
+                "current_trick": list(state.current_trick),
+                "players": state.players,
+            },
+        )
+
+    if len(state.current_trick) < len(state.players):
+        state.current_player_index = (player_index + 1) % len(state.players)
+        return None
+
+    winner_index = determine_trick_winner(state.current_trick, lead_player_index)
+    winner = state.players[winner_index]
+    played_cards = list(state.current_trick)
+    winner.taken_cards.extend(played_cards)
+    state.current_trick = []
+    state.current_player_index = winner_index
+
+    payload = {
+        "round_number": state.round_number,
+        "winner": winner,
+        "winner_index": winner_index,
+        "played_cards": played_cards,
+        "players": state.players,
+        "hearts_broken": state.hearts_broken,
+    }
+    emit_hearts_event(event_callback, "trick_winner", payload)
+    emit_hearts_event(event_callback, "trick_complete", payload)
+
+    state.round_number += 1
+    return payload
 
 
-def prompt_human_play(player: Player, current_trick: list[Card], playable_cards: list[Card]) -> Card:
+def prompt_human_play(
+    player: Player,
+    current_trick: list[Card],
+    playable_cards: list[Card],
+    help_callback=None,
+) -> Card:
     while True:
         print(f"{player.name}, it's your turn.")
         if current_trick:
@@ -130,7 +193,11 @@ def prompt_human_play(player: Player, current_trick: list[Card], playable_cards:
             marker = " (legal)" if card in playable_cards else ""
             print(f"  {index}. {card}{marker}")
 
-        choice = input("Choose a card number to play: ").strip()
+        choice = input("Choose a card number to play, or type help: ").strip()
+        if help_callback is not None and choice.lower() in {"h", "help"}:
+            help_callback()
+            print("")
+            continue
         if not choice.isdigit():
             print("Please enter a number.\n")
             continue
@@ -187,3 +254,53 @@ def get_turn_legal_plays(
 
 def is_point_card(card: Card) -> bool:
     return card.suit == "hearts" or (card.suit == "spades" and card.rank == "Q")
+
+
+def advance_ai_players(state: GameState, event_callback=None, on_ai_play=None) -> None:
+    while any(player.hand for player in state.players) and not state.current_player().is_human:
+        ai_player = state.current_player()
+        playable_cards = get_turn_legal_plays(
+            ai_player.hand,
+            list(state.current_trick),
+            state.hearts_broken,
+            state.round_number,
+        )
+        chosen_card = choose_card_to_play(playable_cards, list(state.current_trick), state.hearts_broken)
+        if on_ai_play is not None:
+            on_ai_play(ai_player, chosen_card)
+        apply_turn_play(state, state.current_player_index, chosen_card, event_callback=event_callback)
+
+
+def finalize_hearts_scores(state: GameState, event_callback=None) -> None:
+    scores = score_completed_hand(state.players)
+    for player, score in zip(state.players, scores):
+        player.score = score
+    emit_hearts_event(
+        event_callback,
+        "hand_complete",
+        {
+            "round_number": state.round_number,
+            "scores": {player.name: player.score for player in state.players},
+            "players": state.players,
+            "hearts_broken": state.hearts_broken,
+        },
+    )
+
+
+def emit_hearts_event(event_callback, event_name: str, payload: dict[str, object]) -> None:
+    if event_callback is not None:
+        event_callback(event_name, payload)
+
+
+def emit_match_start_event(state: GameState, event_callback=None) -> None:
+    emit_hearts_event(
+        event_callback,
+        "match_start",
+        {
+            "round_number": state.round_number,
+            "current_player": state.current_player(),
+            "current_player_index": state.current_player_index,
+            "players": state.players,
+            "hearts_broken": state.hearts_broken,
+        },
+    )
