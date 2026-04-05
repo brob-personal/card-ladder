@@ -1,0 +1,66 @@
+{
+  "intro": [
+    "Good evening. I do hope you are not nervous.",
+    "I have been dead a very long time. The cards remain lively.",
+    "Do sit down. I promise to haunt only the score.",
+    "I once played a duke, a bishop, and a cheat in one sitting.",
+    "The living do so fidget when the deal begins.",
+    "I have outlasted empires. A card hand should be manageable."
+  ],
+  "hearts_broken": [
+    "Ah. Hearts are broken at last. How familiar.",
+    "There it is, the first crack in the evening.",
+    "How delicate. One heart, and the room turns colder.",
+    "A broken heart. I remember the century for it.",
+    "Yes, that usually happens sooner or later.",
+    "A pity. I had hoped for a gentler haunting."
+  ],
+  "alfred_takes_points": [
+    "I seem to have collected something unfortunate.",
+    "Points again. Even death spares one no paperwork.",
+    "How tiresome. I preferred the silence before that trick.",
+    "I have taken worse from Napoleon, but not by much.",
+    "A small burden. I have carried heavier curses.",
+    "Unpleasant, though hardly my bleakest evening."
+  ],
+  "player_takes_points": [
+    "Oh dear. The trick appears to have followed you home.",
+    "That was expensive in the old sense of the word.",
+    "A costly little flourish. Admirably tragic.",
+    "You take points like a lord accepting bad news.",
+    "I have seen that expression on admirals and bankrupts.",
+    "The afterlife teaches patience. You may need some now."
+  ],
+  "player_ahead": [
+    "You are ahead. I should dislike that if I still had blood.",
+    "A bold lead. I once saw Nelson hold a worse one.",
+    "You are doing rather well for someone still mortal.",
+    "How unsettling. You may yet earn my professional respect.",
+    "You lead the table. The grave will hear of this.",
+    "Promising. Do try not to spoil it with confidence."
+  ],
+  "alfred_ahead": [
+    "I do appear to be drifting comfortably ahead.",
+    "There we are. Order returns, as it generally does.",
+    "I have enjoyed leads like this since Waterloo.",
+    "You hear that? It is the sound of experience winning.",
+    "A pleasant margin. One could almost call it ancestral.",
+    "I have had centuries to practice looking inevitable."
+  ],
+  "victory": [
+    "Well played. It is irritating, which means it is genuine.",
+    "You have beaten me. I shall brood with dignity.",
+    "A rare defeat. I dislike how fresh it feels.",
+    "You may brag. I shall simply linger resentfully.",
+    "Splendid work. I hope you appreciate the historical significance.",
+    "I once lost to Casanova. This is more embarrassing."
+  ],
+  "defeat": [
+    "A respectable effort. Respectable is not victorious, sadly.",
+    "You have lost. The dead remain annoyingly consistent.",
+    "Another quiet triumph for the long departed.",
+    "Do not look so stricken. I have beaten better people.",
+    "I once ruined a prince with a hand much like that.",
+    "Time favors me. It has had ample opportunity."
+  ]
+}
