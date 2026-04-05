@@ -1,4 +1,5 @@
 import random
+import sys
 
 from engine.cards import Card
 from games.hearts.logic import play_hearts_hand, setup_hearts_round, sort_cards
@@ -17,6 +18,7 @@ from traits.traits import (
     use_medium_hint,
     use_thief_swap,
 )
+from ui.app import launch_gui_scaffold
 
 
 def main() -> None:
@@ -335,4 +337,10 @@ def print_alfred_dialogue(event_key: str) -> None:
 
 
 if __name__ == "__main__":
-    main()
+    if "--gui" in sys.argv:
+        launch_gui_scaffold(
+            selected_trait_name=THIEF.name,
+            table_modifier=choose_table_modifier(),
+        )
+    else:
+        main()
